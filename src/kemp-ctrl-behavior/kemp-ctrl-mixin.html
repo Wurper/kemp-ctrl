@@ -1,0 +1,102 @@
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+<script type="text/javascript">
+(() => {
+	'use strict';
+	window.KempCtrl = window.KempCtrl || {};
+
+	/**
+	 * @polymer
+	 * @mixinFunction
+	 */
+	 KempCtrl.KempCtrlMixin = (superClass) => class extends superClass {
+		constructor() {
+			super();
+		}
+		static get properties() {
+			return {
+				requestHeader: {
+					type: Uint8Array,
+					value: [0xf0, 0x00, 0x20, 0x33, 0x02, 0x7f]
+				},
+				responseHeader: {
+					type: Uint8Array,
+					value: [0xf0, 0x00, 0x20, 0x33, 0x00, 0x00]
+				},
+				functionCodes: {
+					type: Object,
+					value: {
+						singleTextResponse: 0x03
+					}
+				},
+				parameters: {
+					type: Object,
+					value: {
+						rig: {
+							page: 4,
+							params: {
+								tempo: 0,
+								volume: 1,
+								tempoEnable: 2
+							}
+						},
+						preset: {
+							page: 0,
+							params: {
+								name: 1
+							}
+						}
+					}
+				}
+			};
+		}
+		hello() {
+			console.log('hello');
+		}
+		parseResponse(data) {
+			if (data.length === 1 && data[0] === 0xfe) {
+				return;
+			}
+			for (let i = 0; i < this.responseHeader.length; i += 1) {
+				if (data[i] !== this.responseHeader[i]) {
+					console.error('Invalid midi response header: ' + data);
+					return;
+				}
+			}
+			const fcFromData = data[6],
+				fc = this.functionCodes;
+			switch (fcFromData) {
+			case fc.singleTextResponse: 
+				this.parseAddresses(data.slice(8, 10));
+				this.parseSingleText(data.slice(10));
+				break;
+			default:
+				console.log('Unimplemented function code: 0x' + fcFromData.toString(16));
+				break;
+			}
+			
+		}
+		parseSingleText(data) {
+			let string = '';
+			for (let i = 0; i < data.length - 2; i += 1) {
+				string += String.fromCharCode(data[i]);
+			}
+			console.log('Parsed text value: ' + string);
+		}
+		parseAddresses(addressBytes) {
+			const p = this.parameters;
+			switch (addressBytes[0]) {
+			case p.preset.page:
+				Object.keys(p.preset.params).forEach(key => {
+					if (p.preset.params[key] === addressBytes[1]) {
+						console.log('preset - ' + key);
+					}
+				});
+				break;
+			default:
+				console.log('Unimplemented address: 0x' + addressBytes[0] + ' 0x' + addressBytes[1]);
+			}
+		}
+	};
+	
+})();
+</script>

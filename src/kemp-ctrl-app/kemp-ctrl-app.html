@@ -1,0 +1,132 @@
+<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/paper-dropdown-menu/paper-dropdown-menu.html">
+<link rel="import" href="../../bower_components/paper-listbox/paper-listbox.html">
+<link rel="import" href="../../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+
+<link rel="import" href="../kemp-ctrl-behavior/kemp-ctrl-mixin.html">
+
+<dom-module id="kemp-ctrl-app">
+	<template>
+		<style>
+			:host {
+				display: block;
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+		<h2>Hello [[prop1]]!</h2>
+		<div class="layout vertical">
+			<div class="layout horizontal">
+				<paper-dropdown-menu
+					label="MIDI output device"
+					noink no-animations
+					on-selected-item-changed="onSelectedOutput">
+					<paper-listbox slot="dropdown-content" class="dropdown-content">
+						<template id="repeatOutputs" is="dom-repeat" items="[[ midiOutputDevices ]]">
+							<paper-item id="[[ item.id ]]">[[ item.name ]]</paper-item>
+						</template>
+					</paper-listbox>
+				</paper-dropdown-menu>
+				<paper-dropdown-menu
+					label="MIDI input device"
+					noink no-animations
+					on-selected-item-changed="onSelectedInput">
+					<paper-listbox slot="dropdown-content" class="dropdown-content">
+						<template id="repeatInputs" is="dom-repeat" items="[[ midiInputDevices ]]">
+							<paper-item>[[ item.name ]]</paper-item>
+						</template>
+					</paper-listbox>
+				</paper-dropdown-menu>
+			</div>
+			<div class="layout horizontal">
+				<span>Current rig name:</span>[[ currentRig.name]]
+			</div>
+		</div>
+	</template>
+
+	<script>
+		/**
+			* @customElement
+			* @polymer
+			*/
+	class KempCtrlApp extends KempCtrl.KempCtrlMixin(Polymer.Element) {
+		static get is() { return 'kemp-ctrl-app'; }
+		static get properties() {
+			return {
+				prop1: {
+					type: String,
+					value: 'kemp-ctrl-app'
+				},
+				midiInterface: {
+					type: Object
+				},
+				midiOutputDevices: {
+					type: Array,
+					computed: '_computeMidiOutputDevices(midiInterface.outputs)'
+				},
+				midiInputDevices: {
+					type: Array,
+					computed: '_computeMidiInputDevices(midiInterface.inputs)'
+				},
+				outputDevice: {
+					type: Object
+				},
+				inputDevice: {
+					type: Object,
+					observer: '_onInputDeviceChanged'
+				},
+				currentRig: {
+					type: Object,
+					computed: '_computeCurrentRig(outputDevice, inputDevice)'
+				}
+			};
+		}
+		ready() {
+			super.ready();
+			this.hello();
+			if (navigator.requestMIDIAccess) {
+				navigator.requestMIDIAccess({ sysex: true }).then(midiInterface => this.set('midiInterface', midiInterface), error => console.log(error));
+			} else {
+				console.log('Web MIDI API not supported!');
+			}
+		}
+		_computeMidiOutputDevices(outputs) {
+			const outDevs = [];
+			outputs.forEach(item => outDevs.push(item));
+			return outDevs;
+		}
+		_computeMidiInputDevices(inputs) {
+			const inDevices = [];
+			inputs.forEach(item => inDevices.push(item));
+			return inDevices;
+		}
+		_computeCurrentRig(outputDevice, inputDevice) {
+			if (!outputDevice || !inputDevice) {
+				return;
+			}
+			outputDevice.send(this.requestHeader.concat([0x43, 0x00, 0x00, 0x01, 0xf7]));
+		}
+		onSelectedInput(event, detail) {
+			this.set('inputDevice', this.$.repeatInputs.modelForElement(detail.value).item);
+		}
+		onSelectedOutput(event, detail) {
+			this.set('outputDevice', this.$.repeatOutputs.modelForElement(detail.value).item);
+		}
+		_onInputDeviceChanged(device) {
+			device.onmidimessage = this.onMidiMessage.bind(this);
+		}
+		onMidiMessage(event) {
+			const data = event.data;
+			let bytesString = '';
+			for (let i = 0; i < data.length; i += 1) {
+				bytesString += '0x' + data[i].toString(16) + ' ';
+			}
+			console.log(bytesString);
+			this.parseResponse(data);
+		}
+	}
+
+	window.customElements.define(KempCtrlApp.is, KempCtrlApp);
+	</script>
+</dom-module>

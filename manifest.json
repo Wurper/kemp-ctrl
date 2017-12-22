@@ -1,0 +1,7 @@
+{
+  "name": "kemp-ctrl",
+  "short_name": "kemp-ctrl",
+  "description": "Control Kemper Profiling Amplifier",
+  "start_url": "/",
+  "display": "standalone"
+}
